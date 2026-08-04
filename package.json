@@ -16,5 +16,8 @@
   "bugs": {
     "url": "https://github.com/SlvrGinkai/ruumi-thrift-api/issues"
   },
-  "homepage": "https://github.com/SlvrGinkai/ruumi-thrift-api#readme"
+  "homepage": "https://github.com/SlvrGinkai/ruumi-thrift-api#readme",
+  "dependencies": {
+    "fastify": "^5.11.2"
+  }
 }
