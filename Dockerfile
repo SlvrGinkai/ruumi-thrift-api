@@ -17,4 +17,4 @@ COPY . .
 EXPOSE 3000
 
 # Keep the container alive for now
-CMD ["tail", "-f", "/dev/null"]
+CMD ["npm", "run", "dev"]
