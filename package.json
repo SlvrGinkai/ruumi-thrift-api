@@ -21,11 +21,16 @@
   },
   "homepage": "https://github.com/SlvrGinkai/ruumi-thrift-api#readme",
   "dependencies": {
-    "fastify": "^5.11.2"
+    "@fastify/jwt": "^9.x.x",
+    "@fastify/multipart": "^9.x.x",
+    "fastify": "^5.x.x",
+    "ioredis": "^5.x.x",
+    "minio": "^8.x.x",
+    "pg": "^8.22.0"
   },
   "devDependencies": {
-    "@types/node": "^26.1.2",
-    "tsx": "^4.23.5",
-    "typescript": "^7.0.2"
+    "@types/node": "latest",
+    "tsx": "^4.x.x",
+    "typescript": "latest"
   }
 }

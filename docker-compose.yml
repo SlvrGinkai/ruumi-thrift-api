@@ -73,6 +73,9 @@ services:
 
     environment:
       NODE_ENV: development
+      DATABASE_URL: "postgresql://ruumi:ruumi_pass@postgres:5432/ruumi_thrift"
+
+    command: ["sh", "-c", "npm install && npm run dev"]
 
     depends_on:
       - postgres

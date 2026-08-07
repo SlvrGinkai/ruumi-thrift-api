@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Ruumi Thrift Test UI</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        padding: 24px;
+        background: #f5f7fb;
+        color: #111827;
+      }
+      .container {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+      .card {
+        background: white;
+        border-radius: 12px;
+        padding: 16px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.06);
+        margin-bottom: 16px;
+      }
+      form {
+        display: grid;
+        gap: 10px;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 10px;
+      }
+      input,
+      textarea,
+      button {
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #d1d5db;
+        font-size: 14px;
+      }
+      button {
+        background: #2563eb;
+        color: white;
+        border: none;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #4b5563;
+      }
+      .item-list {
+        display: grid;
+        gap: 12px;
+      }
+      .item {
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .muted {
+        color: #6b7280;
+        font-size: 13px;
+      }
+      .status {
+        margin-top: 8px;
+        color: #065f46;
+      }
+      .error {
+        color: #b91c1c;
+      }
+      .row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Ruumi Thrift Test UI</h1>
+      <p class="muted">
+        Create items, search them, and place offers against the API.
+      </p>
+
+      <div class="card">
+        <h2>Create item</h2>
+        <form id="create-item-form">
+          <div class="grid">
+            <input name="title" placeholder="Title" required />
+            <input name="price" type="number" placeholder="Price" required />
+            <input name="category" placeholder="Category" />
+            <input name="location" placeholder="Location" />
+            <input name="sellerId" placeholder="Seller ID" value="seller-1" />
+          </div>
+          <textarea name="description" placeholder="Description"></textarea>
+          <input name="images" placeholder="Image URLs (comma separated)" />
+          <button type="submit">Create item</button>
+        </form>
+        <div id="create-status" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>Search items</h2>
+        <div class="row">
+          <input
+            id="search-input"
+            placeholder="Search by title or description"
+            style="flex: 1"
+          />
+          <button onclick="loadItems()" class="secondary">Search</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Items</h2>
+        <div id="items-list" class="item-list"></div>
+      </div>
+    </div>
+
+    <script>
+      const apiBase = "/api";
+      const createForm = document.getElementById("create-item-form");
+      const createStatus = document.getElementById("create-status");
+      const searchInput = document.getElementById("search-input");
+      const itemsList = document.getElementById("items-list");
+
+      async function loadItems() {
+        const query = searchInput.value.trim();
+        const url = query
+          ? `${apiBase}/items?q=${encodeURIComponent(query)}`
+          : `${apiBase}/items`;
+        try {
+          const res = await fetch(url);
+          const data = await res.json();
+          renderItems(data.items || []);
+        } catch (err) {
+          itemsList.innerHTML = `<div class="error">Failed to load items.</div>`;
+        }
+      }
+
+      function renderItems(items) {
+        if (!items.length) {
+          itemsList.innerHTML = '<div class="muted">No items yet.</div>';
+          return;
+        }
+
+        itemsList.innerHTML = items
+          .map((item) => {
+            const images = Array.isArray(item.images) ? item.images : [];
+            const imageHtml = images.length
+              ? `<div class="muted">Images: ${images.map((img) => img.url || img).join(", ")}</div>`
+              : "";
+            return `
+            <div class="item">
+              <h3>${item.title}</h3>
+              <div class="muted">${item.description || "No description"}</div>
+              <div class="row">
+                <strong>$${item.price}</strong>
+                <span>${item.category || "uncategorized"}</span>
+                <span>${item.location || "unknown"}</span>
+              </div>
+              ${imageHtml}
+              <div class="row" style="margin-top: 10px;">
+                <input id="buyer-${item.id}" placeholder="Buyer ID" value="buyer-1" />
+                <input id="amount-${item.id}" type="number" placeholder="Offer amount" value="${Math.max(item.price + 10, 0)}" />
+                <button onclick="placeOffer('${item.id}')" class="secondary">Place offer</button>
+              </div>
+              <div id="offer-status-${item.id}" class="status"></div>
+            </div>
+          `;
+          })
+          .join("");
+      }
+
+      async function placeOffer(itemId) {
+        const buyerIdInput = document.getElementById(`buyer-${itemId}`);
+        const amountInput = document.getElementById(`amount-${itemId}`);
+        const statusEl = document.getElementById(`offer-status-${itemId}`);
+        const buyerId = buyerIdInput.value.trim() || "buyer-1";
+        const amount = Number(amountInput.value);
+
+        try {
+          const res = await fetch(`${apiBase}/items/${itemId}/offers`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ buyerId, amount }),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed");
+          statusEl.textContent = `Offer created: ${data.status}`;
+        } catch (err) {
+          statusEl.textContent = err.message;
+          statusEl.className = "error";
+        }
+      }
+
+      createForm.addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const formData = new FormData(createForm);
+        const payload = {
+          title: formData.get("title"),
+          description: formData.get("description") || "",
+          price: Number(formData.get("price")),
+          category: formData.get("category") || "",
+          location: formData.get("location") || "",
+          sellerId: formData.get("sellerId") || "seller-1",
+          images: (formData.get("images") || "")
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean),
+        };
+
+        try {
+          const res = await fetch(`${apiBase}/items`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || "Failed to create item");
+          createStatus.textContent = `Item created: ${data.title}`;
+          createForm.reset();
+          document.querySelector('input[name="sellerId"]').value = "seller-1";
+          await loadItems();
+        } catch (err) {
+          createStatus.textContent = err.message;
+          createStatus.className = "error";
+        }
+      });
+
+      loadItems();
+    </script>
+  </body>
+</html>
