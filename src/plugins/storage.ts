@@ -22,6 +22,25 @@ export async function ensureStorageBucket() {
   if (!exists) {
     await minioClient.makeBucket(bucket);
   }
+
+  const policy = JSON.stringify({
+    Version: "2012-10-17",
+    Statement: [
+      {
+        Effect: "Allow",
+        Principal: { AWS: ["*"] },
+        Action: ["s3:GetObject"],
+        Resource: [`arn:aws:s3:::${bucket}/*`],
+      },
+    ],
+  });
+
+  try {
+    await minioClient.setBucketPolicy(bucket, policy);
+  } catch {
+    // ignore bucket policy errors for local testing
+  }
+
   return bucket;
 }
 

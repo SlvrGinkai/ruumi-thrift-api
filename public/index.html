@@ -226,12 +226,18 @@
 
         const uploadRes = await fetch(signedData.uploadUrl, {
           method: "PUT",
-          headers: { "Content-Type": signedData.contentType },
+          headers: {
+            "Content-Type": signedData.contentType,
+            "x-amz-acl": "public-read",
+          },
           body: file,
         });
 
         if (!uploadRes.ok) {
-          throw new Error("Image upload failed");
+          const responseText = await uploadRes.text().catch(() => "");
+          throw new Error(
+            `Image upload failed: ${responseText || uploadRes.status}`,
+          );
         }
 
         return [signedData.publicUrl];
