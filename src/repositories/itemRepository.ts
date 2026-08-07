@@ -1,5 +1,10 @@
 import { randomUUID } from "crypto";
 import { pool } from "../plugins/db";
+import {
+  deleteCachedKey,
+  getCachedJson,
+  setCachedJson,
+} from "../plugins/redis";
 
 export type CreateItemInput = {
   title: string;
@@ -87,6 +92,7 @@ export const createItem = async (input: CreateItemInput) => {
     }
 
     await client.query("COMMIT");
+    await deleteCachedKey("items:*");
     return findItemById(itemId);
   } catch (error) {
     await client.query("ROLLBACK");
@@ -132,6 +138,24 @@ export const findItemById = async (id: string) => {
 };
 
 export const searchItems = async (filters: ItemSearchFilters) => {
+  const limit = Math.min(filters.limit ?? 20, 50);
+  const cacheKey = `items:${JSON.stringify({
+    query: filters.query || null,
+    category: filters.category || null,
+    location: filters.location || null,
+    minPrice: filters.minPrice ?? null,
+    maxPrice: filters.maxPrice ?? null,
+    limit,
+    cursor: filters.cursor || null,
+  })}`;
+
+  const cached = await getCachedJson<{ items: any[]; nextCursor?: string }>(
+    cacheKey,
+  );
+  if (cached) {
+    return cached;
+  }
+
   const conditions: string[] = ["TRUE"];
   const values: any[] = [];
 
@@ -171,7 +195,6 @@ export const searchItems = async (filters: ItemSearchFilters) => {
     );
   }
 
-  const limit = Math.min(filters.limit ?? 20, 50);
   values.push(limit + 1);
 
   const result = await pool.query(
@@ -210,8 +233,11 @@ export const searchItems = async (filters: ItemSearchFilters) => {
     ? encodeCursor(rows[limit].createdAt, rows[limit].id)
     : undefined;
 
-  return {
+  const resultPayload = {
     items,
     nextCursor,
   };
+
+  await setCachedJson(cacheKey, resultPayload, 60);
+  return resultPayload;
 };
