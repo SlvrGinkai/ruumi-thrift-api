@@ -77,11 +77,17 @@
         gap: 10px;
         flex-wrap: wrap;
       }
+      .preview {
+        max-width: 100%;
+        max-height: 140px;
+        margin-top: 8px;
+        border-radius: 8px;
+      }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>Ruumi Thrift Test UI</h1>
+      <h1>Ruumi Thrift Test Page</h1>
       <p class="muted">
         Create items, search them, and place offers against the API.
       </p>
@@ -97,7 +103,8 @@
             <input name="sellerId" placeholder="Seller ID" value="seller-1" />
           </div>
           <textarea name="description" placeholder="Description"></textarea>
-          <input name="images" placeholder="Image URLs (comma separated)" />
+          <input type="file" accept="image/*" id="image-file" />
+          <!-- <input name="images" placeholder="Image URLs (comma separated)" /> -->
           <button type="submit">Create item</button>
         </form>
         <div id="create-status" class="status"></div>
@@ -152,7 +159,7 @@
           .map((item) => {
             const images = Array.isArray(item.images) ? item.images : [];
             const imageHtml = images.length
-              ? `<div class="muted">Images: ${images.map((img) => img.url || img).join(", ")}</div>`
+              ? `<div>${images.map((img) => `<img class="preview" src="${img.url || img}" alt="${item.title}" />`).join("")}</div>`
               : "";
             return `
             <div class="item">
@@ -198,23 +205,62 @@
         }
       }
 
+      async function uploadImage(file) {
+        if (!file) {
+          return [];
+        }
+
+        const signedRes = await fetch(`${apiBase}/upload-url`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            fileName: file.name,
+            contentType: file.type || "application/octet-stream",
+          }),
+        });
+
+        const signedData = await signedRes.json();
+        if (!signedRes.ok) {
+          throw new Error(signedData.error || "Failed to get upload URL");
+        }
+
+        const uploadRes = await fetch(signedData.uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": signedData.contentType },
+          body: file,
+        });
+
+        if (!uploadRes.ok) {
+          throw new Error("Image upload failed");
+        }
+
+        return [signedData.publicUrl];
+      }
+
       createForm.addEventListener("submit", async (event) => {
         event.preventDefault();
         const formData = new FormData(createForm);
-        const payload = {
-          title: formData.get("title"),
-          description: formData.get("description") || "",
-          price: Number(formData.get("price")),
-          category: formData.get("category") || "",
-          location: formData.get("location") || "",
-          sellerId: formData.get("sellerId") || "seller-1",
-          images: (formData.get("images") || "")
-            .split(",")
-            .map((item) => item.trim())
-            .filter(Boolean),
-        };
+        const imageFile = document.getElementById("image-file").files[0];
 
         try {
+          createStatus.textContent = "Uploading image...";
+          const uploadedImages = await uploadImage(imageFile);
+          const manualImages = (formData.get("images") || "")
+            .toString()
+            .split(",")
+            .map((item) => item.trim())
+            .filter(Boolean);
+
+          const payload = {
+            title: formData.get("title"),
+            description: formData.get("description") || "",
+            price: Number(formData.get("price")),
+            category: formData.get("category") || "",
+            location: formData.get("location") || "",
+            sellerId: formData.get("sellerId") || "seller-1",
+            images: [...uploadedImages, ...manualImages],
+          };
+
           const res = await fetch(`${apiBase}/items`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -224,6 +270,7 @@
           if (!res.ok) throw new Error(data.error || "Failed to create item");
           createStatus.textContent = `Item created: ${data.title}`;
           createForm.reset();
+          document.getElementById("image-file").value = "";
           document.querySelector('input[name="sellerId"]').value = "seller-1";
           await loadItems();
         } catch (err) {
